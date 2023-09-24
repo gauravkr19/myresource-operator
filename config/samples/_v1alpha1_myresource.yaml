@@ -9,11 +9,12 @@ metadata:
     app.kubernetes.io/created-by: myresource
   name: myresource-sample
 spec:
-  image: nginx:latest
-  imageDB: docker.io/gauravkr19/postgres-data
+  image: "nginx:latest"
+  imageDB: "docker.io/gauravkr19/postgres-data"
   deploymentReplicas: 1
   statefulSetReplicas: 1
-  pvcSize: 1Gi
-  pvcExtensionNeeded: false
-  newPVCSize: 2Gi
-  targetNamespace: myapp-namespace
+  pvcSize: "1Gi"
+  pvcExtensionNeeded: true
+  newPVCSize: "2Gi"
+  targetNamespace: "myapp-namespace"
+

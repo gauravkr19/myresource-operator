@@ -81,9 +81,9 @@ func (r *MyResourceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
-	// Create PVC
+	// Create PVC; ignore error if PVC exists
 	pvcName := myResource.Name + "-db" + "-pvc"
-	if err := r.createPVC(ctx, myResource, pvcName); err != nil {
+	if err := r.createPVC(ctx, myResource, pvcName); err != nil && !errors.IsAlreadyExists(err) {
 		logger.Error(err, "Failed to create or update PVC")
 		return ctrl.Result{}, err
 	}
@@ -405,8 +405,8 @@ func (r *MyResourceReconciler) createPVC(ctx context.Context, myResource *gaurav
 			},
 		},
 	}
-	// Create the PVC
-	if err := r.Client.Create(ctx, pvc); err != nil {
+	// Create the PVC, ignore error if PVC exists
+	if err := r.Client.Create(ctx, pvc); err != nil && !errors.IsAlreadyExists(err) {
 		logger.Error(err, "Failed to create PVC")
 		return err
 	}
