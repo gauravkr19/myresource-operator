@@ -33,6 +33,10 @@ type MyResourceSpec struct {
 	DeploymentReplicas  int32  `json:"deploymentReplicas,omitempty"`
 	StatefulSetReplicas int32  `json:"statefulSetReplicas,omitempty"`
 	PVCSize             string `json:"pvcSize,omitempty"`
+
+	PVCExtensionNeeded bool   `json:"pvcExtensionNeeded"`
+	NewPVCSize         string `json:"newPVCSize"`
+	TargetNamespace    string `json:"targetNamespace"`
 }
 
 // MyResourceStatus defines the observed state of MyResource

@@ -18,16 +18,17 @@ package controllers
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/runtime"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	gauravkr19devv1alpha1 "github.com/gauravkr19/myresource/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // var log = log.Log.WithName("my-resource-controller")
@@ -68,7 +69,19 @@ func (r *MyResourceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	// Create or update the PVC
+	// Create the target namespace for the workload if it doesn't exist
+	if err := r.ensureNamespaceExists(ctx, myResource.Spec.TargetNamespace); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// PVC Extension
+	if myResource.Spec.PVCExtensionNeeded {
+		if err := r.extendPVC(ctx, myResource); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	// Create PVC
 	pvcName := myResource.Name + "-db" + "-pvc"
 	if err := r.createPVC(ctx, myResource, pvcName); err != nil {
 		logger.Error(err, "Failed to create or update PVC")
@@ -120,6 +133,57 @@ func (r *MyResourceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
+// ******************** End of Reconcile func ************************
+
+// Create Namespace for the workloads if it does not exist
+func (r *MyResourceReconciler) ensureNamespaceExists(ctx context.Context, namespaceName string) error {
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespaceName,
+		},
+	}
+	// Try to create the namespace; ignore errors if it already exists
+	if err := r.Create(ctx, ns); err != nil && !errors.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
+}
+
+// Extend PVC if required
+func (r *MyResourceReconciler) extendPVC(ctx context.Context, myResource *gauravkr19devv1alpha1.MyResource) error {
+	logger := log.FromContext(ctx)
+
+	// Fetch the PVC to be extended
+	pvc := &corev1.PersistentVolumeClaim{}
+	if err := r.Get(ctx, types.NamespacedName{Namespace: myResource.Spec.TargetNamespace, Name: myResource.Name + "-db" + "-pvc"}, pvc); err != nil {
+		return err
+	}
+
+	// Convert newSize to a resource.Quantity
+	desiredSize, err := resource.ParseQuantity(myResource.Spec.NewPVCSize)
+	if err != nil {
+		return err
+	}
+
+	// Compare the PVC's storage size with the desired size
+	currentSize := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
+	if currentSize.Cmp(desiredSize) == 0 {
+		logger.Info("PVC is already extended to the desired size")
+		return nil
+	}
+
+	// Update the PVC's storage size
+	pvc.Spec.Resources.Requests[corev1.ResourceStorage] = desiredSize
+
+	if err := r.Update(ctx, pvc); err != nil {
+		logger.Error(err, "Failed to update PVC")
+		return err
+	}
+
+	logger.Info("PVC extended to the desired size")
+	return nil
+}
+
 // DEPLOYMENT
 func (r *MyResourceReconciler) createOrUpdateDeployment(ctx context.Context, myResource *gauravkr19devv1alpha1.MyResource) error {
 	logger := log.FromContext(ctx)
@@ -130,7 +194,7 @@ func (r *MyResourceReconciler) createOrUpdateDeployment(ctx context.Context, myR
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      myResource.Name + "-deployment",
-			Namespace: myResource.Namespace,
+			Namespace: myResource.Spec.TargetNamespace,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &myResource.Spec.DeploymentReplicas,
@@ -225,7 +289,7 @@ func (r *MyResourceReconciler) createSecret(ctx context.Context, myResource *gau
 
 	// Define the Secret based on myResource specifications
 	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: secretName, Namespace: myResource.Namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: secretName, Namespace: myResource.Spec.TargetNamespace},
 		Type:       corev1.SecretTypeOpaque,
 		StringData: sec,
 	}
@@ -252,7 +316,7 @@ func (r *MyResourceReconciler) createOrUpdateStatefulSet(ctx context.Context, my
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      myResource.Name + "-db" + "-statefulset",
-			Namespace: myResource.Namespace,
+			Namespace: myResource.Spec.TargetNamespace,
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas: &myResource.Spec.StatefulSetReplicas,
@@ -330,7 +394,7 @@ func (r *MyResourceReconciler) createPVC(ctx context.Context, myResource *gaurav
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pvcName,
-			Namespace: myResource.Namespace,
+			Namespace: myResource.Spec.TargetNamespace,
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
@@ -359,7 +423,7 @@ func (r *MyResourceReconciler) createServiceApp(ctx context.Context, myResource 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
-			Namespace: myResource.Namespace,
+			Namespace: myResource.Spec.TargetNamespace,
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{"app": myResource.Name + "-app"},
@@ -390,7 +454,7 @@ func (r *MyResourceReconciler) createServiceDB(ctx context.Context, myResource *
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
-			Namespace: myResource.Namespace,
+			Namespace: myResource.Spec.TargetNamespace,
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{"app": myResource.Name + "-db"},

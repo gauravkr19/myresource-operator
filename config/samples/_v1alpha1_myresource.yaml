@@ -14,3 +14,6 @@ spec:
   deploymentReplicas: 1
   statefulSetReplicas: 1
   pvcSize: 1Gi
+  pvcExtensionNeeded: false
+  newPVCSize: 2Gi
+  targetNamespace: myapp-namespace
