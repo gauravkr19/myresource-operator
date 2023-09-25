@@ -48,6 +48,7 @@ type MyResourceReconciler struct {
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -187,13 +188,14 @@ func (r *MyResourceReconciler) extendPVC(ctx context.Context, myResource *gaurav
 // DEPLOYMENT
 func (r *MyResourceReconciler) createOrUpdateDeployment(ctx context.Context, myResource *gauravkr19devv1alpha1.MyResource) error {
 	logger := log.FromContext(ctx)
+	dbHostVal := ""
 
 	logger.Info("Reconciling Deployment...")
 
 	// Define your Deployment based on myResource specifications
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      myResource.Name + "-deployment",
+			Name:      myResource.Name + "-deploymentApp",
 			Namespace: myResource.Spec.TargetNamespace,
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -220,14 +222,17 @@ func (r *MyResourceReconciler) createOrUpdateDeployment(ctx context.Context, myR
 										Key: "POSTGRES_PASSWORD",
 									},
 								}},
-								{Name: "POSTGRES_DB",
-									Value: "alertsnitch",
+								{Name: "DB_HOST",
+									Value: "myresource-sample-db-statefulset-service.myapp-namespace.svc.cluster.local",
 								},
-								{Name: "POSTGRES_USER",
-									Value: "alertsnitch",
+								{Name: "DB_NAME",
+									Value: "my_database",
 								},
-								{Name: "POSTGRES_HOST",
-									Value: "hostname",
+								{Name: "DB_USER",
+									Value: "postgres",
+								},
+								{Name: "DB_PASSWORD",
+									Value: "postgres",
 								}}, // End of Env listed values and Env definition
 						},
 					},
@@ -280,7 +285,7 @@ func (r *MyResourceReconciler) CreateOrUpdate(ctx context.Context, obj client.Ob
 func (r *MyResourceReconciler) createSecret(ctx context.Context, myResource *gauravkr19devv1alpha1.MyResource, secretName string, secKey string, secVal string) error {
 	logger := log.FromContext(ctx)
 	secKey = "POSTGRES_PASSWORD"
-	secVal = "alertsnitch"
+	secVal = "postgres"
 
 	logger.Info("Creating Secret...")
 
@@ -343,19 +348,16 @@ func (r *MyResourceReconciler) createOrUpdateStatefulSet(ctx context.Context, my
 										Key: "POSTGRES_PASSWORD",
 									},
 								}},
-								{Name: "POSTGRES_DB",
-									Value: "alertsnitch",
-								},
 								{Name: "POSTGRES_USER",
-									Value: "alertsnitch",
+									Value: "postgres",
 								},
-								{Name: "PGDATA",
-									Value: "/var/lib/postgresql/data/pgdata",
+								{Name: "POSTGRES_DB",
+									Value: "my_database",
 								}}, // End of Env listed values and Env definition
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "database-volume",
-									MountPath: "/var/lib/postgresql/data",
+									MountPath: "/data",
 								},
 							},
 						},
@@ -429,7 +431,7 @@ func (r *MyResourceReconciler) createServiceApp(ctx context.Context, myResource 
 			Selector: map[string]string{"app": myResource.Name + "-app"},
 			Ports: []corev1.ServicePort{
 				{
-					Port: 80,
+					Port: 8080,
 					Name: "http",
 				},
 			},
@@ -458,6 +460,7 @@ func (r *MyResourceReconciler) createServiceDB(ctx context.Context, myResource *
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{"app": myResource.Name + "-db"},
+			Type:     corev1.ServiceTypeLoadBalancer,
 			Ports: []corev1.ServicePort{
 				{
 					Port: 5432,
