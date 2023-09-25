@@ -188,14 +188,14 @@ func (r *MyResourceReconciler) extendPVC(ctx context.Context, myResource *gaurav
 // DEPLOYMENT
 func (r *MyResourceReconciler) createOrUpdateDeployment(ctx context.Context, myResource *gauravkr19devv1alpha1.MyResource) error {
 	logger := log.FromContext(ctx)
-	dbHostVal := ""
+	// dbHostVal := ""
 
 	logger.Info("Reconciling Deployment...")
 
 	// Define your Deployment based on myResource specifications
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      myResource.Name + "-deploymentApp",
+			Name:      myResource.Name + "-deployment-crudapp",
 			Namespace: myResource.Spec.TargetNamespace,
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -324,7 +324,8 @@ func (r *MyResourceReconciler) createOrUpdateStatefulSet(ctx context.Context, my
 			Namespace: myResource.Spec.TargetNamespace,
 		},
 		Spec: appsv1.StatefulSetSpec{
-			Replicas: &myResource.Spec.StatefulSetReplicas,
+			Replicas:    &myResource.Spec.StatefulSetReplicas,
+			ServiceName: myResource.Name + "-db" + "-statefulset-service",
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": myResource.Name + "-db"},
 			},
@@ -336,8 +337,7 @@ func (r *MyResourceReconciler) createOrUpdateStatefulSet(ctx context.Context, my
 					Containers: []corev1.Container{
 						{
 							Name:  myResource.Name + "-db" + "-container",
-							Image: "docker.io/gauravkr19/postgres-data",
-							// Image: myResource.Spec.ImageDB,
+							Image: myResource.Spec.ImageDB,
 							Env: []corev1.EnvVar{{
 								Name: "POSTGRES_PASSWORD",
 								ValueFrom: &corev1.EnvVarSource{
@@ -451,6 +451,7 @@ func (r *MyResourceReconciler) createServiceApp(ctx context.Context, myResource 
 func (r *MyResourceReconciler) createServiceDB(ctx context.Context, myResource *gauravkr19devv1alpha1.MyResource, serviceName string) error {
 	logger := log.FromContext(ctx)
 	logger.Info("Creating Service...")
+	// none type svc - Type: corev1.ServiceTypeNone,
 
 	// Define your Service based on myResource specifications
 	service := &corev1.Service{

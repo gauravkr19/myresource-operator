@@ -15,6 +15,6 @@ spec:
   statefulSetReplicas: 1
   pvcSize: "1Gi"
   pvcExtensionNeeded: false
-  newPVCSize: "1Gi"
+  newPVCSize: "2Gi"
   targetNamespace: "myapp-namespace"
 
