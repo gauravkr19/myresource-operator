@@ -348,6 +348,9 @@ func (r *MyResourceReconciler) createOrUpdateStatefulSet(ctx context.Context, my
 										Key: "POSTGRES_PASSWORD",
 									},
 								}},
+								{Name: "PGDATA",
+									Value: "/var/lib/postgresql/data/pgdata",
+								},
 								{Name: "POSTGRES_USER",
 									Value: "postgres",
 								},
@@ -357,7 +360,7 @@ func (r *MyResourceReconciler) createOrUpdateStatefulSet(ctx context.Context, my
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "database-volume",
-									MountPath: "/data",
+									MountPath: "/var/lib/postgresql/data",
 								},
 							},
 						},
