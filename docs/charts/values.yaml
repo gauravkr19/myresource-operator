@@ -1,0 +1,59 @@
+controller:
+
+  # Set the number of replicas for the operator.
+  # @type: integer
+  replicas: 1
+
+  # namespace to deploy operator
+  # namespace: myresource-crudapp-operator
+
+  kubeRbacProxy:
+    # Image sets the repo and tag of the kube-rbac-proxy image to use for the controller.
+    image:
+      repository: gcr.io/kubebuilder/kube-rbac-proxy
+      tag: v0.14.1
+
+    # Configures the default resources for the kube rbac proxy container.
+    resources:
+      limits:
+        cpu: 500m
+        memory: 128Mi
+      requests:
+        cpu: 5m
+        memory: 64Mi
+
+  # Settings related to the manager myresource-operator container.
+  manager:
+
+    # Image sets the repo and tag of the vault-secrets-operator image to use for the controller.
+    image:
+      repository: docker.io/gauravkr19/myresource
+      tag: 0.2.4
+
+    # Configures the default resources for the controller-manager container.
+    # @type: map
+    resources:
+      limits:
+        cpu: 500m
+        memory: 128Mi
+      requests:
+        cpu: 10m
+        memory: 64Mi      
+
+# Values for deploying the CR - myResource
+myResource:
+
+  # Size of the PVC when Deploying the for workload 
+  pvcSize: "1Gi"
+ 
+  # Is PV extension needed?
+  pvcExtensionNeeded: false
+
+  # Provide the new PVC size, example, PVC will be extended to 2Gi by default when PVC extension is enabled
+  newPVCSize: "2Gi"
+
+  # Image for CRUD app and it Postgres DB
+  image: "docker.io/gauravkr19/go-app"
+  imageDB: "docker.io/gauravkr19/postgresdb"  
+
+

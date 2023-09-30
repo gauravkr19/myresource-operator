@@ -70,10 +70,10 @@ func (r *MyResourceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	// Create the target namespace for the workload if it doesn't exist
-	if err := r.ensureNamespaceExists(ctx, myResource.Spec.TargetNamespace); err != nil {
-		return ctrl.Result{}, err
-	}
+	// Create the target namespace for the workload if it doesn't exist --> taken care from helm
+	// if err := r.ensureNamespaceExists(ctx, myResource.Namespace); err != nil {
+	// 	return ctrl.Result{}, err
+	// }
 
 	// PVC Extension
 	if myResource.Spec.PVCExtensionNeeded {
@@ -137,18 +137,18 @@ func (r *MyResourceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 // ******************** End of Reconcile func ************************
 
 // Create Namespace for the workloads if it does not exist
-func (r *MyResourceReconciler) ensureNamespaceExists(ctx context.Context, namespaceName string) error {
-	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespaceName,
-		},
-	}
-	// Try to create the namespace; ignore errors if it already exists
-	if err := r.Create(ctx, ns); err != nil && !errors.IsAlreadyExists(err) {
-		return err
-	}
-	return nil
-}
+// func (r *MyResourceReconciler) ensureNamespaceExists(ctx context.Context, namespaceName string) error {
+// 	ns := &corev1.Namespace{
+// 		ObjectMeta: metav1.ObjectMeta{
+// 			Name: namespaceName,
+// 		},
+// 	}
+// 	// Try to create the namespace; ignore errors if it already exists
+// 	if err := r.Create(ctx, ns); err != nil && !errors.IsAlreadyExists(err) {
+// 		return err
+// 	}
+// 	return nil
+// }
 
 // Extend PVC if required
 func (r *MyResourceReconciler) extendPVC(ctx context.Context, myResource *gauravkr19devv1alpha1.MyResource) error {
@@ -156,7 +156,7 @@ func (r *MyResourceReconciler) extendPVC(ctx context.Context, myResource *gaurav
 
 	// Fetch the PVC to be extended
 	pvc := &corev1.PersistentVolumeClaim{}
-	if err := r.Get(ctx, types.NamespacedName{Namespace: myResource.Spec.TargetNamespace, Name: myResource.Name + "-db" + "-pvc"}, pvc); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Namespace: myResource.Namespace, Name: myResource.Name + "-db" + "-pvc"}, pvc); err != nil {
 		return err
 	}
 
@@ -188,7 +188,9 @@ func (r *MyResourceReconciler) extendPVC(ctx context.Context, myResource *gaurav
 // DEPLOYMENT
 func (r *MyResourceReconciler) createOrUpdateDeployment(ctx context.Context, myResource *gauravkr19devv1alpha1.MyResource) error {
 	logger := log.FromContext(ctx)
-	// dbHostVal := ""
+
+	// create a string to point to a statefulSet Pod
+	dbHostVal := myResource.Name + "-db" + "-statefulset-service." + myResource.Namespace + ".svc.cluster.local"
 
 	logger.Info("Reconciling Deployment...")
 
@@ -196,7 +198,7 @@ func (r *MyResourceReconciler) createOrUpdateDeployment(ctx context.Context, myR
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      myResource.Name + "-deployment-crudapp",
-			Namespace: myResource.Spec.TargetNamespace,
+			Namespace: myResource.Namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &myResource.Spec.DeploymentReplicas,
@@ -223,7 +225,7 @@ func (r *MyResourceReconciler) createOrUpdateDeployment(ctx context.Context, myR
 									},
 								}},
 								{Name: "DB_HOST",
-									Value: "myresource-sample-db-statefulset-service.myapp-namespace.svc.cluster.local",
+									Value: dbHostVal,
 								},
 								{Name: "DB_NAME",
 									Value: "my_database",
@@ -294,7 +296,7 @@ func (r *MyResourceReconciler) createSecret(ctx context.Context, myResource *gau
 
 	// Define the Secret based on myResource specifications
 	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: secretName, Namespace: myResource.Spec.TargetNamespace},
+		ObjectMeta: metav1.ObjectMeta{Name: secretName, Namespace: myResource.Namespace},
 		Type:       corev1.SecretTypeOpaque,
 		StringData: sec,
 	}
@@ -321,7 +323,7 @@ func (r *MyResourceReconciler) createOrUpdateStatefulSet(ctx context.Context, my
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      myResource.Name + "-db" + "-statefulset",
-			Namespace: myResource.Spec.TargetNamespace,
+			Namespace: myResource.Namespace,
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas:    &myResource.Spec.StatefulSetReplicas,
@@ -399,7 +401,7 @@ func (r *MyResourceReconciler) createPVC(ctx context.Context, myResource *gaurav
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pvcName,
-			Namespace: myResource.Spec.TargetNamespace,
+			Namespace: myResource.Namespace,
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
@@ -428,7 +430,7 @@ func (r *MyResourceReconciler) createServiceApp(ctx context.Context, myResource 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
-			Namespace: myResource.Spec.TargetNamespace,
+			Namespace: myResource.Namespace,
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{"app": myResource.Name + "-app"},
@@ -460,7 +462,7 @@ func (r *MyResourceReconciler) createServiceDB(ctx context.Context, myResource *
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
-			Namespace: myResource.Spec.TargetNamespace,
+			Namespace: myResource.Namespace,
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{"app": myResource.Name + "-db"},

@@ -1,0 +1,21 @@
+apiVersion: gauravkr19.dev/v1alpha1
+kind: MyResource
+metadata:
+  labels:
+    app.kubernetes.io/name: myresource
+    app.kubernetes.io/instance: myresource-sample
+    app.kubernetes.io/part-of: myresource
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: myresource
+  name: {{ include "chart.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  image: {{ .Values.myResource.image }}
+  imageDB: {{ .Values.myResource.imageDB }}
+  deploymentReplicas: 1
+  statefulSetReplicas: 1
+  pvcSize: {{ .Values.myResource.pvcSize }}
+  pvcExtensionNeeded: {{ .Values.myResource.pvcExtensionNeeded }}
+  newPVCSize: {{ .Values.myResource.newPVCSize }}
+
+

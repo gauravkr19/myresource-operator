@@ -1,0 +1,9 @@
+apiVersion: v2
+appVersion: 0.2.0
+description: Operator to deploy CRUD app and it backend with its PV and optionally extend PV
+kubeVersion: '>=1.24.0-0'
+name: myresource-operator
+sources:
+- https://github.com/gauravkr19/myresource-operator
+type: application
+version: 0.2.0

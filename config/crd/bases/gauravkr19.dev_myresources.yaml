@@ -51,12 +51,9 @@ spec:
               statefulSetReplicas:
                 format: int32
                 type: integer
-              targetNamespace:
-                type: string
             required:
             - newPVCSize
             - pvcExtensionNeeded
-            - targetNamespace
             type: object
           status:
             description: MyResourceStatus defines the observed state of MyResource

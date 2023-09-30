@@ -1,5 +1,6 @@
 apiVersion: gauravkr19.dev/v1alpha1
 kind: MyResource
+# namespace: "takes the value from --current context"
 metadata:
   labels:
     app.kubernetes.io/name: myresource
@@ -16,5 +17,4 @@ spec:
   pvcSize: "1Gi"
   pvcExtensionNeeded: false
   newPVCSize: "2Gi"
-  targetNamespace: "myapp-namespace"
-
+  # targetNamespace: "myapp-new-ns"
