@@ -48,12 +48,24 @@ spec:
                 type: boolean
               pvcSize:
                 type: string
+              secretData:
+                description: SecretData defines the Secret data
+                properties:
+                  dbPassword:
+                    type: string
+                  dbUser:
+                    type: string
+                required:
+                - dbPassword
+                - dbUser
+                type: object
               statefulSetReplicas:
                 format: int32
                 type: integer
             required:
             - newPVCSize
             - pvcExtensionNeeded
+            - secretData
             type: object
           status:
             description: MyResourceStatus defines the observed state of MyResource

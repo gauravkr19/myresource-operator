@@ -10,12 +10,23 @@ metadata:
   name: {{ include "chart.fullname" . }}
   namespace: {{ .Release.Namespace }}
 spec:
+  # image of crud app
   image: {{ .Values.myResource.image }}
   imageDB: {{ .Values.myResource.imageDB }}
   deploymentReplicas: 1
   statefulSetReplicas: 1
+
+  # Original size of PVC
   pvcSize: {{ .Values.myResource.pvcSize }}
+
+  # Is PVC extension needed?
   pvcExtensionNeeded: {{ .Values.myResource.pvcExtensionNeeded }}
+  
+  # New size of PVC  
   newPVCSize: {{ .Values.myResource.newPVCSize }}
 
-
+  # Secret value for database and application. has database credentials
+  secretData:
+    required: true
+    dbUser: {{ .Values.myResource.secretData.dbUser }}
+    dbPassword: {{ .Values.myResource.secretData.dbPassword }}

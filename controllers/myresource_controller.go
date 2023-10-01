@@ -90,42 +90,41 @@ func (r *MyResourceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// Create or update the Secret for Deployment
-	secretName := myResource.Name + "-app" + "-secret"
-	secKey := "somekey"
-	secVal := "someval"
-	if err := r.createSecret(ctx, myResource, secretName, secKey, secVal); err != nil {
+	secretName := myResource.Name + "-app-secret"
+	if err := r.createOrUpdateSecret(ctx, myResource, secretName); err != nil && !errors.IsAlreadyExists(err) {
 		logger.Error(err, "Failed to create or update Secret")
 		return ctrl.Result{}, err
 	}
+
 	// Create or update the Secret for Statefulset
-	secretName = myResource.Name + "-db" + "-secret"
-	if err := r.createSecret(ctx, myResource, secretName, secKey, secVal); err != nil {
+	secretName = myResource.Name + "-db-secret"
+	if err := r.createOrUpdateSecret(ctx, myResource, secretName); err != nil && !errors.IsAlreadyExists(err) {
 		logger.Error(err, "Failed to create or update Secret")
 		return ctrl.Result{}, err
 	}
 
 	// Create Service for Deployment
 	deploymentServiceName := myResource.Name + "-app" + "-deployment-service"
-	if err := r.createServiceApp(ctx, myResource, deploymentServiceName); err != nil {
+	if err := r.createServiceApp(ctx, myResource, deploymentServiceName); err != nil && !errors.IsAlreadyExists(err) {
 		logger.Error(err, "Failed to create Deployment Service")
 		return ctrl.Result{}, err
 	}
 
 	// Create Service for StatefulSet
 	statefulSetServiceName := myResource.Name + "-db" + "-statefulset-service"
-	if err := r.createServiceDB(ctx, myResource, statefulSetServiceName); err != nil {
+	if err := r.createServiceDB(ctx, myResource, statefulSetServiceName); err != nil && !errors.IsAlreadyExists(err) {
 		logger.Error(err, "Failed to create StatefulSet Service")
 		return ctrl.Result{}, err
 	}
 
 	// Reconcile the Deployment
-	if err := r.createOrUpdateDeployment(ctx, myResource); err != nil {
+	if err := r.createOrUpdateDeployment(ctx, myResource); err != nil && !errors.IsAlreadyExists(err) {
 		logger.Error(err, "Failed to reconcile Deployment")
 		return ctrl.Result{}, err
 	}
 
 	// Reconcile the StatefulSet
-	if err := r.createOrUpdateStatefulSet(ctx, myResource); err != nil {
+	if err := r.createOrUpdateStatefulSet(ctx, myResource); err != nil && !errors.IsAlreadyExists(err) {
 		logger.Error(err, "Failed to reconcile StatefulSet")
 		return ctrl.Result{}, err
 	}
@@ -214,28 +213,23 @@ func (r *MyResourceReconciler) createOrUpdateDeployment(ctx context.Context, myR
 						{
 							Name:  myResource.Name + "-app" + "-container",
 							Image: myResource.Spec.Image,
-							Env: []corev1.EnvVar{{
-								Name: "POSTGRES_PASSWORD",
-								ValueFrom: &corev1.EnvVarSource{
-									SecretKeyRef: &corev1.SecretKeySelector{
+							EnvFrom: []corev1.EnvFromSource{
+								{
+									SecretRef: &corev1.SecretEnvSource{
 										LocalObjectReference: corev1.LocalObjectReference{
-											Name: myResource.Name + "-app" + "-secret",
+											Name: myResource.Name + "-app-secret",
 										},
-										Key: "POSTGRES_PASSWORD",
 									},
-								}},
+								},
+							},
+							Env: []corev1.EnvVar{
 								{Name: "DB_HOST",
 									Value: dbHostVal,
 								},
 								{Name: "DB_NAME",
 									Value: "my_database",
 								},
-								{Name: "DB_USER",
-									Value: "postgres",
-								},
-								{Name: "DB_PASSWORD",
-									Value: "postgres",
-								}}, // End of Env listed values and Env definition
+							}, // End of Env listed values and Env definition
 						},
 					},
 					// Volumes: []corev1.Volume{
@@ -253,7 +247,7 @@ func (r *MyResourceReconciler) createOrUpdateDeployment(ctx context.Context, myR
 		},
 	}
 
-	// Use the custom CreateOrUpdate function to create or update the Deployment
+	// Use the CreateOrUpdate function to create or update the Deployment
 	if err := r.CreateOrUpdate(ctx, deployment); err != nil {
 		logger.Error(err, "Failed to create or update Deployment")
 		return err
@@ -263,6 +257,7 @@ func (r *MyResourceReconciler) createOrUpdateDeployment(ctx context.Context, myR
 	return nil
 }
 
+// func CreateOrUpdate to create or update Deployment and StatefulSet
 func (r *MyResourceReconciler) CreateOrUpdate(ctx context.Context, obj client.Object) error {
 	logger := log.FromContext(ctx)
 
@@ -284,32 +279,40 @@ func (r *MyResourceReconciler) CreateOrUpdate(ctx context.Context, obj client.Ob
 	return err
 }
 
-func (r *MyResourceReconciler) createSecret(ctx context.Context, myResource *gauravkr19devv1alpha1.MyResource, secretName string, secKey string, secVal string) error {
+// func createOrUpdateSecret to create / update secret
+func (r *MyResourceReconciler) createOrUpdateSecret(ctx context.Context, myResource *gauravkr19devv1alpha1.MyResource, secretName string) error {
 	logger := log.FromContext(ctx)
-	secKey = "POSTGRES_PASSWORD"
-	secVal = "postgres"
 
 	logger.Info("Creating Secret...")
-
-	sec := make(map[string]string)
-	sec[secKey] = secVal
 
 	// Define the Secret based on myResource specifications
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: secretName, Namespace: myResource.Namespace},
 		Type:       corev1.SecretTypeOpaque,
-		StringData: sec,
+		Data: map[string][]byte{
+			"DB_USER":           []byte(myResource.Spec.SecretData.DBUser),
+			"POSTGRES_PASSWORD": []byte(myResource.Spec.SecretData.DBPassword),
+		},
 	}
 	// Create the Secret
-	if err := r.Client.Create(ctx, secret); err != nil {
+	if err := r.Client.Create(ctx, secret); err != nil && !errors.IsAlreadyExists(err) {
 		logger.Error(err, "Failed to create Secret")
 		return err
+	}
+
+	// Secret already exists; update it if needed
+	if secret.Data["DB_USER"] == nil || secret.Data["POSTGRES_PASSWORD"] == nil ||
+		string(secret.Data["DB_USER"]) != myResource.Spec.SecretData.DBUser ||
+		string(secret.Data["POSTGRES_PASSWORD"]) != myResource.Spec.SecretData.DBPassword {
+		secret.Data["DB_USER"] = []byte(myResource.Spec.SecretData.DBUser)
+		secret.Data["POSTGRES_PASSWORD"] = []byte(myResource.Spec.SecretData.DBPassword)
+		return r.Client.Update(context.TODO(), secret)
 	}
 
 	// Set the owner reference for the
 	ctrl.SetControllerReference(myResource, secret, r.Scheme)
 
-	logger.Info("Secret creation completed successfully")
+	logger.Info("Secret creation for App completed successfully")
 	return nil
 }
 
@@ -340,25 +343,23 @@ func (r *MyResourceReconciler) createOrUpdateStatefulSet(ctx context.Context, my
 						{
 							Name:  myResource.Name + "-db" + "-container",
 							Image: myResource.Spec.ImageDB,
-							Env: []corev1.EnvVar{{
-								Name: "POSTGRES_PASSWORD",
-								ValueFrom: &corev1.EnvVarSource{
-									SecretKeyRef: &corev1.SecretKeySelector{
+							EnvFrom: []corev1.EnvFromSource{
+								{
+									SecretRef: &corev1.SecretEnvSource{
 										LocalObjectReference: corev1.LocalObjectReference{
-											Name: myResource.Name + "-db" + "-secret",
+											Name: myResource.Name + "-db-secret",
 										},
-										Key: "POSTGRES_PASSWORD",
 									},
-								}},
+								},
+							},
+							Env: []corev1.EnvVar{
 								{Name: "PGDATA",
 									Value: "/var/lib/postgresql/data/pgdata",
 								},
-								{Name: "POSTGRES_USER",
-									Value: "postgres",
-								},
 								{Name: "POSTGRES_DB",
 									Value: "my_database",
-								}}, // End of Env listed values and Env definition
+								},
+							}, // End of Env listed values and Env definition
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "database-volume",
@@ -383,7 +384,7 @@ func (r *MyResourceReconciler) createOrUpdateStatefulSet(ctx context.Context, my
 	}
 
 	// Use the custom CreateOrUpdate function to create or update the StatefulSet
-	if err := r.CreateOrUpdate(ctx, statefulSet); err != nil {
+	if err := r.CreateOrUpdate(ctx, statefulSet); err != nil && !errors.IsAlreadyExists(err) {
 		logger.Error(err, "Failed to create or update StatefulSet")
 		return err
 	}
@@ -422,6 +423,7 @@ func (r *MyResourceReconciler) createPVC(ctx context.Context, myResource *gaurav
 	return nil
 }
 
+// Create Service for App
 func (r *MyResourceReconciler) createServiceApp(ctx context.Context, myResource *gauravkr19devv1alpha1.MyResource, serviceName string) error {
 	logger := log.FromContext(ctx)
 	logger.Info("Creating Service...")
@@ -446,13 +448,15 @@ func (r *MyResourceReconciler) createServiceApp(ctx context.Context, myResource 
 	ctrl.SetControllerReference(myResource, service, r.Scheme)
 
 	// Create the Service
-	if err := r.Client.Create(ctx, service); err != nil {
+	if err := r.Client.Create(ctx, service); err != nil && !errors.IsAlreadyExists(err) {
 		logger.Error(err, "Failed to create Service")
 		return err
 	}
 	logger.Info("Service creation completed successfully")
 	return nil
 }
+
+// Create Service for DB
 func (r *MyResourceReconciler) createServiceDB(ctx context.Context, myResource *gauravkr19devv1alpha1.MyResource, serviceName string) error {
 	logger := log.FromContext(ctx)
 	logger.Info("Creating Service...")
@@ -479,7 +483,7 @@ func (r *MyResourceReconciler) createServiceDB(ctx context.Context, myResource *
 	ctrl.SetControllerReference(myResource, service, r.Scheme)
 
 	// Create the Service
-	if err := r.Client.Create(ctx, service); err != nil {
+	if err := r.Client.Create(ctx, service); err != nil && !errors.IsAlreadyExists(err) {
 		logger.Error(err, "Failed to create Service")
 		return err
 	}
