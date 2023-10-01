@@ -1,8 +1,39 @@
 # myresource
-// TODO(user): Add simple overview of use/purpose
+myresource operator deploys a frontend app which performs CRUD operations and stores the data in Postgres database in Kubernetes, GKE.
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+### Operator features
+Operator is developed using Operator SDK framework. It deploys the frontend CRUD app as a Deployment and a database as StatefulSet. The database is backed by a PVC. The PVC can be extended by passing `true` value to `pvcExtensionNeeded` field in CR or Helm values.yaml. The operator is packaged into Helm chart for easy deployment. 
+
+### CRUD App
+The app has 4 APIs accessed internaly within the Pod's shell at the following path:
+* `api/create` for Create
+* `api/records` for Read
+* `api/update` for Update
+* `api/delete` for Delete
+
+### Helm values.yaml
+Helm Chart requires values for  `dbUser` `dbPassword`. This is hardecoded in values.yaml but should be passed as `--set' field to not expose the secrets.
+The Helm chart is served from Github Pages and the repo can be added using:
+```sh
+helm repo add crud-app https://gauravkr19.github.io/myresource-operator
+helm search repo
+```
+The operator can be installed with command:
+
+```sh
+helm install crudapp crud-app/myresource-operator  -f docs/charts/values.yaml  --namespace crudapp --create-namespace
+```
+
+The operator and the apps are installed in `crudapp` namespace created by helm, else will be deployed in `default` namespace
+The installation fails without the values of `bUser`, `dbPassword` passed via `values.yaml`. These values are hardcoded for demo purpose.
+
+
+### Important paths listed for quick reference
+* Helm Chart files `https://github.com/gauravkr19/myresource-operator/tree/main/docs/charts`.
+* controller.go `https://github.com/gauravkr19/myresource-operator/blob/main/controllers/myresource_controller.go`.
+* types.go `https://github.com/gauravkr19/myresource-operator/blob/main/api/v1alpha1/myresource_types.go`.
+* crudapp
 
 ## Getting Started
 You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
