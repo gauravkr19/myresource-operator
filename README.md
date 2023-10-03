@@ -7,10 +7,32 @@ Operator is developed using Operator SDK framework. It deploys the frontend CRUD
 
 ### CRUD App
 The app has 4 APIs accessed internaly within the Pod's shell at the following path:
-* `api/create` for Create
-* `api/records` for Read
-* `api/update` for Update
-* `api/delete` for Delete
+* `/api/create` for Create
+* `/api/records` for Read
+* `/api/update` for Update
+* `/api/delete` for Delete
+
+#### Request and Response
+```
+$ # CREATE
+$ curl -X POST -H "Content-Type: application/json" -d '{"ID": 13, "AlertID": 45, "Label": "namespace", "Value": "crud-app"}' http://localhost:8080/api/create
+Created record with ID 13 and AlertID 45
+
+$ # READ
+$ curl localhost:8080/api/records
+{"id":13,"alertid":45,"label":"namespace","value":"crud-app"}
+
+$ # UPDATE
+$ curl -X POST -H "Content-Type: application/json" -d '{"ID": 13, "AlertID": 45, "Label": "namespace", "Value": "frontend"}' http://localhost:8080/api/update
+Updated record with ID 13 and AlertID 45
+$ curl localhost:8080/api/records
+{"id":13,"alertid":45,"label":"namespace","value":"frontend"}
+
+$ # DELETE
+$ curl -X DELETE "http://localhost:8080/api/delete?num_records=1"
+$ curl localhost:8080/api/records
+
+```
 
 ### Helm values.yaml
 Helm Chart requires values for  `dbUser` `dbPassword`. This is hardecoded in values.yaml but should be passed as `--set' field to not expose the secrets.
@@ -33,7 +55,9 @@ The installation fails without the values of `bUser`, `dbPassword` passed via `v
 * Helm Chart files `https://github.com/gauravkr19/myresource-operator/tree/main/docs/charts`.
 * controller.go `https://github.com/gauravkr19/myresource-operator/blob/main/controllers/myresource_controller.go`.
 * types.go `https://github.com/gauravkr19/myresource-operator/blob/main/api/v1alpha1/myresource_types.go`.
-* crudapp
+* crudapp `https://github.com/gauravkr19/crudapp`
+
+
 
 ## Getting Started
 You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
@@ -122,4 +146,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
