@@ -213,6 +213,18 @@ func (r *MyResourceReconciler) createOrUpdateDeployment(ctx context.Context, myR
 						{
 							Name:  myResource.Name + "-app" + "-container",
 							Image: myResource.Spec.Image,
+							ReadinessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path:   "/healthz",
+										Port:   intstr.FromInt(8080),
+										Scheme: corev1.URISchemeHTTP,
+									},
+								},
+								FailureThreshold: 3,
+								SuccessThreshold: 1,
+								TimeoutSeconds:   1,
+							},
 							EnvFrom: []corev1.EnvFromSource{
 								{
 									SecretRef: &corev1.SecretEnvSource{
