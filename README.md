@@ -5,6 +5,11 @@ myresource operator deploys a frontend app which performs CRUD operations and st
 ### Operator features
 Operator is developed using Operator SDK framework. It deploys the frontend CRUD app as a Deployment and a database as StatefulSet. The database is backed by a PVC. The PVC can be extended by passing `true` value to `pvcExtensionNeeded` field in CR or Helm values.yaml. The operator is packaged into Helm chart for easy deployment. 
 
+### Initilaize operator-sdk
+```
+operator-sdk init --domain gauravkr19.dev --repo github.com/gauravkr19/myresource
+operator-sdk create api --version v1alpha1 --kind MyResource --resource --controller
+```
 ### CRUD App
 The app has 4 APIs accessed internaly within the Pod's shell at the following path:
 * `/api/create` for Create
